@@ -1,29 +1,31 @@
--- ╔══════════════════════════════════════════════════════════╗
--- ║          YUSH HUB | STEAL AN EGG SCRIPT V2             ║
--- ║          Keyless | Full Bypass | SAE Optimized          ║
--- ╚══════════════════════════════════════════════════════════╝
+if not hookmetamethod then hookmetamethod = function() return function(...) return ... end end end
+if not getnamecallmethod then getnamecallmethod = function() return "" end end
+if not fireproximityprompt then
+    fireproximityprompt = function(pp)
+        pcall(function() pp.Triggered:Fire(game.Players.LocalPlayer) end)
+    end
+end
+if not setfpscap then setfpscap = function() end end
+if not writefile then writefile = function() end end
+if not readfile then readfile = function() return "{}" end end
+if not isfile then isfile = function() return false end end
+if not setclipboard then setclipboard = function() end end
+if not syn then syn = {protect_gui = function() end} end
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local MarketplaceService = game:GetService("MarketplaceService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
 
 local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local HRP = Character:WaitForChild("HumanoidRootPart")
 local Humanoid = Character:WaitForChild("Humanoid")
 
--- ╔══════════════════════════════════════╗
--- ║        STRONG BYPASS LAYER          ║
--- ╚══════════════════════════════════════╝
-
--- Block anti-cheat remotes
 local blockedKeywords = {
     "anticheat","anti_cheat","detect","report","flag","ban",
     "cheatdetect","antifly","antispeed","antiteleport","antiexploit",
@@ -38,34 +40,34 @@ local function isBlocked(name)
     return false
 end
 
-local oldNamecall
-oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
-    local method = getnamecallmethod()
-    local args = {...}
-
-    if method == "FireServer" or method == "FireAllClients" then
-        if isBlocked(self.Name) then return nil end
-        if args[1] and isBlocked(tostring(args[1])) then return nil end
-    end
-
-    if method == "InvokeServer" then
-        if isBlocked(self.Name) then return {} end
-    end
-
-    return oldNamecall(self, ...)
-end)
-
--- Velocity spoofer (anti-speed detection)
 local spoofVelocity = false
-local oldIndex
-oldIndex = hookmetamethod(game, "__index", function(self, key)
-    if spoofVelocity and self == HRP and key == "Velocity" then
-        return Vector3.new(0, 0, 0)
-    end
-    return oldIndex(self, key)
+
+pcall(function()
+    local oldNamecall
+    oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+        local method = getnamecallmethod()
+        local args = {...}
+        if method == "FireServer" or method == "FireAllClients" then
+            if isBlocked(self.Name) then return nil end
+            if args[1] and isBlocked(tostring(args[1])) then return nil end
+        end
+        if method == "InvokeServer" then
+            if isBlocked(self.Name) then return {} end
+        end
+        return oldNamecall(self, ...)
+    end)
 end)
 
--- Noclip engine
+pcall(function()
+    local oldIndex
+    oldIndex = hookmetamethod(game, "__index", function(self, key)
+        if spoofVelocity and self == HRP and key == "Velocity" then
+            return Vector3.new(0, 0, 0)
+        end
+        return oldIndex(self, key)
+    end)
+end)
+
 local noclipOn = false
 RunService.Stepped:Connect(function()
     if noclipOn and Character then
@@ -75,7 +77,6 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- Safe teleport (incremental, bypass anti-tp)
 local function SafeTP(target, steps, delay)
     steps = steps or 12
     delay = delay or 0.03
@@ -86,14 +87,12 @@ local function SafeTP(target, steps, delay)
     end
 end
 
--- Anti-AFK engine
 local VU = pcall(function() return game:GetService("VirtualUser") end) and game:GetService("VirtualUser")
 RunService.Heartbeat:Connect(function()
     pcall(function() LocalPlayer:Move(Vector3.new(0,0,0)) end)
     if VU then pcall(function() VU:CaptureController() end) end
 end)
 
--- Respawn safe re-hook
 LocalPlayer.CharacterAdded:Connect(function(c)
     Character = c
     HRP = c:WaitForChild("HumanoidRootPart")
@@ -102,16 +101,13 @@ LocalPlayer.CharacterAdded:Connect(function(c)
     spoofVelocity = false
 end)
 
--- ╔══════════════════════════════════════╗
--- ║          CONFIG SYSTEM              ║
--- ╚══════════════════════════════════════╝
-
 local Config = {
     speed = 16,
     jumpPower = 50,
     minRarity = 1,
     minValue = 0,
     targetEgg = "Any",
+    stealRange = 20,
     autoSteal = false,
     autoHatch = false,
     autoSell = false,
@@ -129,39 +125,40 @@ local Config = {
     invisEgg = false,
     eggESP = false,
     playerESP = false,
-    fpsUnlock = false,
+    infJump = false,
+    antiTrap = false,
+    antiRagdoll = false,
+    eggPreview = false,
+    spawnPredict = false,
+    riftPriority = false,
     fpsCap = 60,
-    keybinds = {},
 }
-
--- ╔══════════════════════════════════════╗
--- ║             UI CONSTANTS            ║
--- ╚══════════════════════════════════════╝
 
 local C = {
-    bg       = Color3.fromRGB(13, 13, 20),
-    panel    = Color3.fromRGB(20, 20, 32),
-    panel2   = Color3.fromRGB(26, 26, 40),
-    accent   = Color3.fromRGB(70, 130, 240),
-    accentD  = Color3.fromRGB(50, 100, 200),
-    text     = Color3.fromRGB(230, 230, 245),
-    subtext  = Color3.fromRGB(130, 130, 160),
-    togOn    = Color3.fromRGB(70, 130, 240),
-    togOff   = Color3.fromRGB(50, 50, 75),
-    border   = Color3.fromRGB(45, 45, 70),
-    red      = Color3.fromRGB(220, 70, 70),
-    gold     = Color3.fromRGB(255, 200, 50),
-    green    = Color3.fromRGB(60, 200, 100),
-    header   = Color3.fromRGB(16, 16, 26),
+    bg      = Color3.fromRGB(13, 13, 20),
+    panel   = Color3.fromRGB(20, 20, 32),
+    panel2  = Color3.fromRGB(26, 26, 40),
+    accent  = Color3.fromRGB(70, 130, 240),
+    accentD = Color3.fromRGB(50, 100, 200),
+    text    = Color3.fromRGB(230, 230, 245),
+    subtext = Color3.fromRGB(130, 130, 160),
+    togOn   = Color3.fromRGB(70, 130, 240),
+    togOff  = Color3.fromRGB(50, 50, 75),
+    border  = Color3.fromRGB(45, 45, 70),
+    red     = Color3.fromRGB(220, 70, 70),
+    gold    = Color3.fromRGB(255, 200, 50),
+    green   = Color3.fromRGB(60, 200, 100),
+    header  = Color3.fromRGB(16, 16, 26),
 }
-
--- ╔══════════════════════════════════════╗
--- ║             GUI SETUP               ║
--- ╚══════════════════════════════════════╝
 
 pcall(function()
     if LocalPlayer.PlayerGui:FindFirstChild("YushHub") then
         LocalPlayer.PlayerGui.YushHub:Destroy()
+    end
+end)
+pcall(function()
+    if game:GetService("CoreGui"):FindFirstChild("YushHub") then
+        game:GetService("CoreGui").YushHub:Destroy()
     end
 end)
 
@@ -171,13 +168,16 @@ ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 999
 
+local guiParented = false
 pcall(function()
     if syn and syn.protect_gui then syn.protect_gui(ScreenGui) end
-    ScreenGui.Parent = game.CoreGui
+    ScreenGui.Parent = game:GetService("CoreGui")
+    guiParented = true
 end)
-if not ScreenGui.Parent then ScreenGui.Parent = LocalPlayer.PlayerGui end
+if not guiParented then
+    ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
 
--- Main window (matches Nocturne V3 proportions)
 local Main = Instance.new("Frame")
 Main.Name = "Main"
 Main.Size = UDim2.new(0, 680, 0, 420)
@@ -186,14 +186,12 @@ Main.BackgroundColor3 = C.bg
 Main.BorderSizePixel = 0
 Main.ClipsDescendants = false
 Main.Parent = ScreenGui
-
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 8)
 
 local MainStroke = Instance.new("UIStroke", Main)
 MainStroke.Color = C.border
 MainStroke.Thickness = 1.2
 
--- Drop shadow
 local Shadow = Instance.new("Frame")
 Shadow.Size = UDim2.new(1, 20, 1, 20)
 Shadow.Position = UDim2.new(0, -10, 0, 8)
@@ -204,17 +202,12 @@ Shadow.ZIndex = 0
 Shadow.Parent = Main
 Instance.new("UICorner", Shadow).CornerRadius = UDim.new(0, 12)
 
--- Clip content inside main
 local ClipFrame = Instance.new("Frame")
 ClipFrame.Size = UDim2.new(1, 0, 1, 0)
 ClipFrame.BackgroundTransparency = 1
 ClipFrame.ClipsDescendants = true
 ClipFrame.ZIndex = 2
 ClipFrame.Parent = Main
-
--- ╔══════════════════════════════════════╗
--- ║             TOP BAR                 ║
--- ╚══════════════════════════════════════╝
 
 local TopBar = Instance.new("Frame")
 TopBar.Name = "TopBar"
@@ -224,7 +217,6 @@ TopBar.BorderSizePixel = 0
 TopBar.ZIndex = 3
 TopBar.Parent = ClipFrame
 
--- Logo box (left of title, like Nocturne)
 local LogoBox = Instance.new("Frame")
 LogoBox.Size = UDim2.new(0, 54, 0, 54)
 LogoBox.Position = UDim2.new(0, 14, 0.5, -27)
@@ -247,7 +239,6 @@ LogoLabel.Position = UDim2.new(0.1, 0, 0.1, 0)
 LogoLabel.ZIndex = 5
 LogoLabel.Parent = LogoBox
 
--- Title text
 local TitleLabel = Instance.new("TextLabel")
 TitleLabel.Text = "YUSH HUB"
 TitleLabel.Font = Enum.Font.GothamBold
@@ -272,7 +263,6 @@ SubLabel.TextXAlignment = Enum.TextXAlignment.Left
 SubLabel.ZIndex = 3
 SubLabel.Parent = ClipFrame
 
--- Separator line
 local Divline = Instance.new("Frame")
 Divline.Size = UDim2.new(1, 0, 0, 1)
 Divline.Position = UDim2.new(0, 0, 0, 44)
@@ -281,7 +271,6 @@ Divline.BorderSizePixel = 0
 Divline.ZIndex = 3
 Divline.Parent = ClipFrame
 
--- Close button
 local CloseBtn = Instance.new("TextButton")
 CloseBtn.Text = "X"
 CloseBtn.Font = Enum.Font.GothamBold
@@ -292,14 +281,10 @@ CloseBtn.Position = UDim2.new(1, -36, 0, 0)
 CloseBtn.Size = UDim2.new(0, 36, 0, 44)
 CloseBtn.ZIndex = 5
 CloseBtn.Parent = ClipFrame
-
 CloseBtn.MouseEnter:Connect(function() CloseBtn.TextColor3 = C.red end)
 CloseBtn.MouseLeave:Connect(function() CloseBtn.TextColor3 = C.subtext end)
-CloseBtn.MouseButton1Click:Connect(function()
-    Main.Visible = false
-end)
+CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false end)
 
--- Minimize
 local MinBtn = Instance.new("TextButton")
 MinBtn.Text = "–"
 MinBtn.Font = Enum.Font.GothamBold
@@ -323,7 +308,6 @@ MinBtn.MouseButton1Click:Connect(function()
     }):Play()
 end)
 
--- Drag
 local dragging, dragStart, startPos
 TopBar.InputBegan:Connect(function(inp)
     if inp.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -342,10 +326,6 @@ UserInputService.InputChanged:Connect(function(inp)
     end
 end)
 
--- ╔══════════════════════════════════════╗
--- ║             SIDEBAR TABS            ║
--- ╚══════════════════════════════════════╝
-
 local Sidebar = Instance.new("Frame")
 Sidebar.Name = "Sidebar"
 Sidebar.Size = UDim2.new(0, 100, 1, -45)
@@ -355,10 +335,6 @@ Sidebar.BorderSizePixel = 0
 Sidebar.ZIndex = 3
 Sidebar.Parent = ClipFrame
 
-local SideStroke = Instance.new("UIStroke", Sidebar)
-SideStroke.Color = C.border
-SideStroke.Thickness = 0
--- right border via frame
 local SideBorderR = Instance.new("Frame")
 SideBorderR.Size = UDim2.new(0, 1, 1, 0)
 SideBorderR.Position = UDim2.new(1, -1, 0, 0)
@@ -374,7 +350,6 @@ SideList.Padding = UDim.new(0, 1)
 local SidePad = Instance.new("UIPadding", Sidebar)
 SidePad.PaddingTop = UDim.new(0, 8)
 
--- Tab branding at bottom of sidebar
 local SideBrand = Instance.new("TextLabel")
 SideBrand.Text = "YUSH HUB"
 SideBrand.Font = Enum.Font.GothamBold
@@ -386,10 +361,6 @@ SideBrand.Size = UDim2.new(1, 0, 0, 20)
 SideBrand.ZIndex = 4
 SideBrand.Parent = Sidebar
 
--- ╔══════════════════════════════════════╗
--- ║          CONTENT BODY               ║
--- ╚══════════════════════════════════════╝
-
 local Body = Instance.new("Frame")
 Body.Name = "Body"
 Body.Size = UDim2.new(1, -100, 1, -45)
@@ -399,17 +370,12 @@ Body.ClipsDescendants = true
 Body.ZIndex = 3
 Body.Parent = ClipFrame
 
--- ╔══════════════════════════════════════╗
--- ║          TAB / PAGE BUILDER         ║
--- ╚══════════════════════════════════════╝
-
 local TABS = {"FARM", "PLAYER", "PREDICTOR", "PROGRESS", "MISC", "SETTINGS"}
 local Pages = {}
 local TabBtns = {}
 local activeTab = nil
 
 for i, tabName in ipairs(TABS) do
-    -- Sidebar button
     local btn = Instance.new("TextButton")
     btn.Name = tabName
     btn.Text = tabName
@@ -424,7 +390,6 @@ for i, tabName in ipairs(TABS) do
     btn.Parent = Sidebar
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 0)
 
-    -- Active indicator bar
     local bar = Instance.new("Frame")
     bar.Size = UDim2.new(0, 3, 0.6, 0)
     bar.Position = UDim2.new(0, 0, 0.2, 0)
@@ -436,7 +401,6 @@ for i, tabName in ipairs(TABS) do
 
     TabBtns[tabName] = {btn = btn, bar = bar}
 
-    -- Content page — two column layout matching Nocturne
     local page = Instance.new("Frame")
     page.Name = tabName
     page.Size = UDim2.new(1, 0, 1, 0)
@@ -446,7 +410,6 @@ for i, tabName in ipairs(TABS) do
     page.Parent = Body
     Pages[tabName] = page
 
-    -- Left column
     local leftCol = Instance.new("ScrollingFrame")
     leftCol.Name = "Left"
     leftCol.Size = UDim2.new(0.5, -1, 1, -10)
@@ -459,12 +422,10 @@ for i, tabName in ipairs(TABS) do
     leftCol.AutomaticCanvasSize = Enum.AutomaticSize.Y
     leftCol.ZIndex = 3
     leftCol.Parent = page
-
     local ll = Instance.new("UIListLayout", leftCol)
     ll.SortOrder = Enum.SortOrder.LayoutOrder
     ll.Padding = UDim.new(0, 5)
 
-    -- Column divider
     local colDiv = Instance.new("Frame")
     colDiv.Size = UDim2.new(0, 1, 1, -10)
     colDiv.Position = UDim2.new(0.5, -1, 0, 5)
@@ -473,7 +434,6 @@ for i, tabName in ipairs(TABS) do
     colDiv.ZIndex = 3
     colDiv.Parent = page
 
-    -- Right column
     local rightCol = Instance.new("ScrollingFrame")
     rightCol.Name = "Right"
     rightCol.Size = UDim2.new(0.5, -9, 1, -10)
@@ -486,7 +446,6 @@ for i, tabName in ipairs(TABS) do
     rightCol.AutomaticCanvasSize = Enum.AutomaticSize.Y
     rightCol.ZIndex = 3
     rightCol.Parent = page
-
     local rl = Instance.new("UIListLayout", rightCol)
     rl.SortOrder = Enum.SortOrder.LayoutOrder
     rl.Padding = UDim.new(0, 5)
@@ -494,9 +453,7 @@ for i, tabName in ipairs(TABS) do
     btn.MouseButton1Click:Connect(function()
         if activeTab == tabName then return end
         activeTab = tabName
-        for name, p in pairs(Pages) do
-            p.Visible = (name == tabName)
-        end
+        for name, p in pairs(Pages) do p.Visible = (name == tabName) end
         for name, t in pairs(TabBtns) do
             if name == tabName then
                 t.btn.TextColor3 = C.text
@@ -512,15 +469,9 @@ for i, tabName in ipairs(TABS) do
     end)
 end
 
--- Column getters
 local function L(tab) return Pages[tab]:FindFirstChild("Left") end
 local function R(tab) return Pages[tab]:FindFirstChild("Right") end
 
--- ╔══════════════════════════════════════╗
--- ║          UI ELEMENT BUILDERS        ║
--- ╚══════════════════════════════════════╝
-
--- Section header (like "WEAPON HACKS" / "MEMORY HACKS" in Nocturne)
 local function AddHeader(col, text)
     local lbl = Instance.new("TextLabel")
     lbl.Text = text
@@ -534,10 +485,8 @@ local function AddHeader(col, text)
     lbl.Parent = col
 end
 
--- Toggle row (matching Nocturne's label + toggle layout)
 local function AddToggle(col, label, default, onChange)
     local state = default or false
-
     local row = Instance.new("Frame")
     row.Size = UDim2.new(1, -4, 0, 32)
     row.BackgroundTransparency = 1
@@ -593,7 +542,6 @@ local function AddToggle(col, label, default, onChange)
     return {frame = row, getState = function() return state end}
 end
 
--- Slider row
 local function AddSlider(col, label, min, max, default, fmt, onChange)
     local val = default
     local frame = Instance.new("Frame")
@@ -649,7 +597,6 @@ local function AddSlider(col, label, min, max, default, fmt, onChange)
     end)
 end
 
--- Button
 local function AddButton(col, label, onClick)
     local btn = Instance.new("TextButton")
     btn.Text = label
@@ -662,7 +609,6 @@ local function AddButton(col, label, onClick)
     btn.ZIndex = 4
     btn.Parent = col
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
-
     btn.MouseEnter:Connect(function()
         TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = C.accent}):Play()
     end)
@@ -673,7 +619,6 @@ local function AddButton(col, label, onClick)
     return btn
 end
 
--- Dropdown
 local function AddDropdown(col, label, options, default, onChange)
     local selected = default or options[1]
     local open = false
@@ -719,7 +664,6 @@ local function AddDropdown(col, label, options, default, onChange)
     dropFrame.Parent = wrapper
     Instance.new("UICorner", dropFrame).CornerRadius = UDim.new(0, 4)
     Instance.new("UIStroke", dropFrame).Color = C.border
-
     local dList = Instance.new("UIListLayout", dropFrame)
     dList.SortOrder = Enum.SortOrder.LayoutOrder
 
@@ -734,7 +678,6 @@ local function AddDropdown(col, label, options, default, onChange)
         optBtn.LayoutOrder = i
         optBtn.ZIndex = 21
         optBtn.Parent = dropFrame
-
         optBtn.MouseButton1Click:Connect(function()
             selected = opt
             btn.Text = opt .. " ▾"
@@ -755,7 +698,6 @@ local function AddDropdown(col, label, options, default, onChange)
     end)
 end
 
--- Info label
 local function AddInfo(col, text)
     local lbl = Instance.new("TextLabel")
     lbl.Text = text
@@ -770,9 +712,10 @@ local function AddInfo(col, text)
     return lbl
 end
 
--- ╔══════════════════════════════════════╗
--- ║         HELPER: FIND THINGS         ║
--- ╚══════════════════════════════════════╝
+local RarityOrder = {
+    ["Common"] = 1, ["Uncommon"] = 2, ["Rare"] = 3,
+    ["Epic"] = 4, ["Legendary"] = 5, ["Mythical"] = 6,
+}
 
 local function findRemote(name, rtype)
     rtype = rtype or "RemoteEvent"
@@ -787,7 +730,7 @@ end
 local function getEggs()
     local eggs = {}
     for _, v in pairs(Workspace:GetDescendants()) do
-        if v.Name:lower():find("egg") and v:IsA("Model") or v:IsA("BasePart") then
+        if v:IsA("Model") and v.Name:lower():find("egg") then
             table.insert(eggs, v)
         end
     end
@@ -797,30 +740,18 @@ end
 local function getClosestEgg()
     local closest, dist = nil, math.huge
     for _, egg in pairs(getEggs()) do
-        local pos = egg:IsA("Model") and egg:GetModelCFrame().Position or egg.Position
-        local d = (HRP.Position - pos).Magnitude
-        if d < dist then dist = d; closest = egg end
+        local ok, pos = pcall(function()
+            return egg:IsA("Model") and egg:GetModelCFrame().Position or egg.Position
+        end)
+        if ok then
+            local d = (HRP.Position - pos).Magnitude
+            if d < dist then dist = d; closest = egg end
+        end
     end
     return closest, dist
 end
 
-local function getPlayers()
-    local list = {}
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then table.insert(list, p) end
-    end
-    return list
-end
-
--- Rarity map (common SAE rarity names)
-local RarityOrder = {
-    ["Common"] = 1, ["Uncommon"] = 2, ["Rare"] = 3,
-    ["Epic"] = 4, ["Legendary"] = 5, ["Mythical"] = 6,
-    ["Godly"] = 7, ["Exclusive"] = 8
-}
-
 local function getRarity(egg)
-    -- Try to read rarity from egg attributes or children
     local attr = egg:GetAttribute("Rarity") or egg:GetAttribute("rarity")
     if attr then return attr end
     local rl = egg:FindFirstChild("Rarity") or egg:FindFirstChild("rarity")
@@ -828,51 +759,70 @@ local function getRarity(egg)
     return "Unknown"
 end
 
+local function getRarityTier(egg)
+    return RarityOrder[getRarity(egg)] or 0
+end
+
+local function tryStealEgg(egg)
+    local stealRemote =
+        findRemote("StealEgg") or
+        findRemote("PickupEgg") or
+        findRemote("GrabEgg") or
+        findRemote("TakeEgg") or
+        findRemote("steal") or
+        findRemote("grab") or
+        findRemote("pickup") or
+        findRemote("collect")
+
+    if stealRemote then
+        pcall(function() stealRemote:FireServer(egg) end)
+    end
+
+    local pp = egg:FindFirstChildOfClass("ProximityPrompt")
+        or (egg.Parent and egg.Parent:FindFirstChildOfClass("ProximityPrompt"))
+    if pp then
+        pcall(function() fireproximityprompt(pp) end)
+    end
+
+    for _, desc in pairs(egg:GetDescendants()) do
+        if desc:IsA("ProximityPrompt") then
+            pcall(function() fireproximityprompt(desc) end)
+        end
+    end
+end
+
 -- ╔══════════════════════════════════════╗
--- ║          FARM TAB FEATURES          ║
+-- ║          FARM TAB                   ║
 -- ╚══════════════════════════════════════╝
 
--- Left: Auto Steal controls
 AddHeader(L("FARM"), "AUTO STEAL")
 
 local autoStealActive = false
-local stealLoop
 
 AddToggle(L("FARM"), "AUTO STEAL EGG", false, function(state)
     autoStealActive = state
     Config.autoSteal = state
     spoofVelocity = state
     if state then
-        stealLoop = task.spawn(function()
+        task.spawn(function()
             while autoStealActive do
                 local egg, dist = getClosestEgg()
-                if egg then
-                    local pos = egg:IsA("Model") and egg:GetModelCFrame() or egg.CFrame
-                    -- Walk close first then interact
+                if egg and getRarityTier(egg) >= Config.minRarity then
                     if dist > 6 then
-                        SafeTP(pos * CFrame.new(0, 0, 4), 6, 0.02)
-                    end
-                    -- Try fire steal remote
-                    local stealRemote = findRemote("steal") or findRemote("grab") or findRemote("collect")
-                    if stealRemote then
-                        pcall(function() stealRemote:FireServer(egg) end)
-                    end
-                    -- Also try proximity prompt
-                    local pp = egg:FindFirstChildOfClass("ProximityPrompt")
-                    if pp then
-                        pcall(function()
-                            fireproximityprompt(pp)
+                        local ok, pos = pcall(function()
+                            return egg:IsA("Model") and egg:GetModelCFrame() or egg.CFrame
                         end)
+                        if ok then SafeTP(pos * CFrame.new(0, 0, 4), 6, 0.02) end
                     end
+                    tryStealEgg(egg)
                 end
-                task.wait(0.5)
+                task.wait(0.4)
             end
         end)
     end
 end)
 
 AddToggle(L("FARM"), "INSTANT STEAL", false, function(state)
-    -- Hook proximity prompt to fire instantly
     if state then
         for _, pp in pairs(Workspace:GetDescendants()) do
             if pp:IsA("ProximityPrompt") then
@@ -892,27 +842,40 @@ AddSlider(L("FARM"), "Steal Range", 5, 100, 20, "%d studs", function(v)
     Config.stealRange = v
 end)
 
-AddDropdown(L("FARM"), "Target Egg", {"Any","Rare+","Epic+","Legendary+","Mythical+","Godly+"}, "Any", function(v)
-    Config.targetEgg = v
-end)
-
-AddSlider(L("FARM"), "Min Rarity Tier", 1, 8, 1, "Tier %d", function(v)
-    Config.minRarity = v
+AddDropdown(L("FARM"), "Min Rarity", {"Any","Uncommon+","Rare+","Epic+","Legendary+","Mythical+"}, "Any", function(v)
+    local map = {["Any"]=1,["Uncommon+"]=2,["Rare+"]=3,["Epic+"]=4,["Legendary+"]=5,["Mythical+"]=6}
+    Config.minRarity = map[v] or 1
 end)
 
 AddButton(L("FARM"), "STEAL CLOSEST EGG NOW", function()
     local egg, dist = getClosestEgg()
     if egg then
-        local pos = egg:IsA("Model") and egg:GetModelCFrame() or egg.CFrame
-        SafeTP(pos * CFrame.new(0, 0, 3), 8, 0.025)
-        local stealRemote = findRemote("steal") or findRemote("grab") or findRemote("collect")
-        if stealRemote then pcall(function() stealRemote:FireServer(egg) end) end
-        local pp = egg:FindFirstChildOfClass("ProximityPrompt")
-        if pp then pcall(function() fireproximityprompt(pp) end) end
+        local ok, pos = pcall(function()
+            return egg:IsA("Model") and egg:GetModelCFrame() or egg.CFrame
+        end)
+        if ok and dist > 6 then SafeTP(pos * CFrame.new(0, 0, 3), 8, 0.025) end
+        tryStealEgg(egg)
     end
 end)
 
--- Right: Auto progression tools
+AddButton(L("FARM"), "STEAL ALL NEARBY EGGS", function()
+    task.spawn(function()
+        for _, egg in pairs(getEggs()) do
+            local ok, pos = pcall(function()
+                return egg:IsA("Model") and egg:GetModelCFrame() or egg.CFrame
+            end)
+            if ok then
+                local dist = (HRP.Position - pos.Position).Magnitude
+                if dist <= Config.stealRange then
+                    SafeTP(pos * CFrame.new(0, 0, 3), 5, 0.02)
+                    tryStealEgg(egg)
+                    task.wait(0.3)
+                end
+            end
+        end
+    end)
+end)
+
 AddHeader(R("FARM"), "AUTO TOOLS")
 
 AddToggle(R("FARM"), "AUTO HATCH & EQUIP", false, function(state)
@@ -920,9 +883,13 @@ AddToggle(R("FARM"), "AUTO HATCH & EQUIP", false, function(state)
     if state then
         task.spawn(function()
             while Config.autoHatch do
-                local hatchRemote = findRemote("hatch") or findRemote("open")
-                local equipRemote = findRemote("equip")
+                local hatchRemote =
+                    findRemote("HatchEgg") or findRemote("OpenEgg") or
+                    findRemote("hatch") or findRemote("open")
+                local equipRemote =
+                    findRemote("EquipPet") or findRemote("equip")
                 if hatchRemote then pcall(function() hatchRemote:FireServer() end) end
+                task.wait(0.5)
                 if equipRemote then pcall(function() equipRemote:FireServer() end) end
                 task.wait(1)
             end
@@ -935,15 +902,18 @@ AddToggle(R("FARM"), "AUTO TREADMILL", false, function(state)
     if state then
         task.spawn(function()
             while Config.autoTreadmill do
-                local treadRemote = findRemote("treadmill") or findRemote("tread") or findRemote("run")
-                if treadRemote then pcall(function() treadRemote:FireServer() end) end
-                local treadObj = Workspace:FindFirstChild("Treadmill", true)
+                local treadObj =
+                    Workspace:FindFirstChild("Treadmill", true) or
+                    Workspace:FindFirstChild("treadmill", true)
                 if treadObj then
-                    local pp = treadObj:FindFirstChildOfClass("ProximityPrompt")
-                    if pp then pcall(function() fireproximityprompt(pp) end) end
-                    if (HRP.Position - treadObj.Position).Magnitude > 8 then
-                        SafeTP(CFrame.new(treadObj.Position + Vector3.new(0, 3, 0)), 6, 0.02)
+                    local treadPos = treadObj:IsA("Model") and treadObj:GetModelCFrame().Position or treadObj.Position
+                    if (HRP.Position - treadPos).Magnitude > 6 then
+                        SafeTP(CFrame.new(treadPos + Vector3.new(0, 3, 0)), 6, 0.02)
                     end
+                    local pp = treadObj:FindFirstChildOfClass("ProximityPrompt") or treadObj:FindFirstChild("ProximityPrompt", true)
+                    if pp then pcall(function() fireproximityprompt(pp) end) end
+                    local treadRemote = findRemote("Treadmill") or findRemote("treadmill") or findRemote("run")
+                    if treadRemote then pcall(function() treadRemote:FireServer() end) end
                 end
                 task.wait(0.8)
             end
@@ -956,7 +926,9 @@ AddToggle(R("FARM"), "AUTO PET SELLING", false, function(state)
     if state then
         task.spawn(function()
             while Config.autoSell do
-                local sellRemote = findRemote("sell") or findRemote("trade")
+                local sellRemote =
+                    findRemote("SellPet") or findRemote("SellEgg") or
+                    findRemote("sell") or findRemote("trade")
                 if sellRemote then pcall(function() sellRemote:FireServer() end) end
                 task.wait(1.5)
             end
@@ -969,7 +941,9 @@ AddToggle(R("FARM"), "AUTO FUSE", false, function(state)
     if state then
         task.spawn(function()
             while Config.autoFuse do
-                local fuseRemote = findRemote("fuse") or findRemote("combine") or findRemote("merge")
+                local fuseRemote =
+                    findRemote("FuseEgg") or findRemote("FusePet") or
+                    findRemote("fuse") or findRemote("combine") or findRemote("merge")
                 if fuseRemote then pcall(function() fuseRemote:FireServer() end) end
                 task.wait(2)
             end
@@ -982,7 +956,8 @@ AddToggle(R("FARM"), "AUTO FAVORITE PETS", false, function(state)
     if state then
         task.spawn(function()
             while Config.autoFavorite do
-                local favRemote = findRemote("favorite") or findRemote("fav")
+                local favRemote =
+                    findRemote("FavoritePet") or findRemote("favorite") or findRemote("fav")
                 if favRemote then pcall(function() favRemote:FireServer() end) end
                 task.wait(2)
             end
@@ -990,17 +965,24 @@ AddToggle(R("FARM"), "AUTO FAVORITE PETS", false, function(state)
     end
 end)
 
-AddToggle(R("FARM"), "AUTO RIFT/BOSS FARM", false, function(state)
+AddToggle(R("FARM"), "AUTO RIFT FARM", false, function(state)
     Config.autoRift = state
     if state then
         task.spawn(function()
             while Config.autoRift do
-                local riftRemote = findRemote("rift") or findRemote("boss") or findRemote("raid")
-                if riftRemote then pcall(function() riftRemote:FireServer() end) end
-                -- Teleport to rift if found
-                local rift = Workspace:FindFirstChild("Rift", true) or Workspace:FindFirstChild("Boss", true)
+                local rift =
+                    Workspace:FindFirstChild("Rift", true) or
+                    Workspace:FindFirstChild("Portal", true) or
+                    Workspace:FindFirstChild("Boss", true)
                 if rift then
-                    SafeTP(CFrame.new(rift.Position + Vector3.new(0, 5, 0)), 6, 0.02)
+                    local riftPos = rift:IsA("Model") and rift:GetModelCFrame().Position or rift.Position
+                    if (HRP.Position - riftPos).Magnitude > 8 then
+                        SafeTP(CFrame.new(riftPos + Vector3.new(0, 5, 0)), 6, 0.02)
+                    end
+                    local pp = rift:FindFirstChildOfClass("ProximityPrompt") or rift:FindFirstChild("ProximityPrompt", true)
+                    if pp then pcall(function() fireproximityprompt(pp) end) end
+                    local riftRemote = findRemote("EnterRift") or findRemote("rift") or findRemote("boss")
+                    if riftRemote then pcall(function() riftRemote:FireServer() end) end
                 end
                 task.wait(3)
             end
@@ -1009,7 +991,7 @@ AddToggle(R("FARM"), "AUTO RIFT/BOSS FARM", false, function(state)
 end)
 
 -- ╔══════════════════════════════════════╗
--- ║         PLAYER TAB FEATURES         ║
+-- ║          PLAYER TAB                 ║
 -- ╚══════════════════════════════════════╝
 
 AddHeader(L("PLAYER"), "MOVEMENT")
@@ -1019,7 +1001,7 @@ AddToggle(L("PLAYER"), "SPEED BOOST", false, function(state)
     Humanoid.WalkSpeed = state and Config.speed or 16
 end)
 
-AddSlider(L("PLAYER"), "Walk Speed", 16, 200, 80, "%d", function(v)
+AddSlider(L("PLAYER"), "Walk Speed", 16, 150, 50, "%d", function(v)
     Config.speed = v
     if Humanoid.WalkSpeed > 16 then Humanoid.WalkSpeed = v end
 end)
@@ -1027,13 +1009,14 @@ end)
 AddToggle(L("PLAYER"), "INFINITE JUMP", false, function(state)
     Config.infJump = state
 end)
+
 UserInputService.JumpRequest:Connect(function()
     if Config.infJump and Humanoid then
         Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
 
-AddSlider(L("PLAYER"), "Jump Power", 50, 500, 100, "%d", function(v)
+AddSlider(L("PLAYER"), "Jump Power", 50, 300, 100, "%d", function(v)
     Humanoid.JumpPower = v
 end)
 
@@ -1046,39 +1029,73 @@ AddToggle(L("PLAYER"), "NOCLIP", false, function(state)
     end
 end)
 
+AddToggle(L("PLAYER"), "ANTI TRAP", false, function(state)
+    Config.antiTrap = state
+    if state then
+        task.spawn(function()
+            while Config.antiTrap do
+                for _, v in pairs(Workspace:GetDescendants()) do
+                    if v.Name:lower():find("trap") and v:IsA("BasePart") then
+                        pcall(function() v.CanTouch = false end)
+                    end
+                end
+                task.wait(0.5)
+            end
+        end)
+    end
+end)
+
+AddToggle(L("PLAYER"), "ANTI RAGDOLL", false, function(state)
+    Config.antiRagdoll = state
+    if state then
+        task.spawn(function()
+            while Config.antiRagdoll do
+                pcall(function()
+                    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+                    Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+                end)
+                task.wait(0.3)
+            end
+        end)
+    end
+end)
+
 AddHeader(R("PLAYER"), "STEALTH & ESP")
 
--- Invisibility (player + egg)
-AddToggle(R("PLAYER"), "INVISIBILITY (PLAYER)", false, function(state)
+AddToggle(R("PLAYER"), "INVISIBILITY", false, function(state)
     Config.invisPlayer = state
     for _, part in pairs(Character:GetDescendants()) do
         if part:IsA("BasePart") or part:IsA("Decal") then
-            part.Transparency = state and 1 or 0
+            pcall(function() part.Transparency = state and 1 or 0 end)
         end
     end
-    -- Keep HRP visible locally for camera
     if HRP then HRP.Transparency = 1 end
 end)
 
-AddToggle(R("PLAYER"), "INVIS EGG (STEAL STEALTH)", false, function(state)
+AddToggle(R("PLAYER"), "INVIS EGG ON STEAL", false, function(state)
     Config.invisEgg = state
-    -- When stealing, make carried egg invisible
     if state then
         for _, v in pairs(Character:GetDescendants()) do
-            if v.Name:lower():find("egg") then
-                if v:IsA("BasePart") then v.Transparency = 1 end
+            if v.Name:lower():find("egg") and v:IsA("BasePart") then
+                v.Transparency = 1
             end
         end
     end
 end)
 
--- Player ESP
+AddToggle(R("PLAYER"), "ANTI HIT", false, function(state)
+    for _, part in pairs(Character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            pcall(function() part.CanTouch = not state end)
+        end
+    end
+end)
+
 local espConnections = {}
 AddToggle(R("PLAYER"), "PLAYER ESP", false, function(state)
     Config.playerESP = state
     for _, c in pairs(espConnections) do c:Disconnect() end
     espConnections = {}
-
     if state then
         local function drawESP(plr)
             if plr == LocalPlayer then return end
@@ -1086,10 +1103,9 @@ AddToggle(R("PLAYER"), "PLAYER ESP", false, function(state)
                 if not Config.playerESP then return end
                 if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
                     local pHRP = plr.Character.HumanoidRootPart
-                    local existing = pHRP:FindFirstChild("_ESP")
-                    if not existing then
+                    if not pHRP:FindFirstChild("_YESP") then
                         local box = Instance.new("SelectionBox")
-                        box.Name = "_ESP"
+                        box.Name = "_YESP"
                         box.Adornee = plr.Character
                         box.Color3 = Color3.fromRGB(70, 130, 240)
                         box.LineThickness = 0.05
@@ -1107,14 +1123,13 @@ AddToggle(R("PLAYER"), "PLAYER ESP", false, function(state)
         for _, p in pairs(Players:GetPlayers()) do
             if p.Character then
                 for _, v in pairs(p.Character:GetDescendants()) do
-                    if v.Name == "_ESP" then v:Destroy() end
+                    if v.Name == "_YESP" then v:Destroy() end
                 end
             end
         end
     end
 end)
 
--- Egg ESP
 AddToggle(R("PLAYER"), "EGG ESP", false, function(state)
     Config.eggESP = state
     task.spawn(function()
@@ -1133,7 +1148,6 @@ AddToggle(R("PLAYER"), "EGG ESP", false, function(state)
             end
             task.wait(1)
         end
-        -- Cleanup
         for _, egg in pairs(getEggs()) do
             local hl = egg:FindFirstChild("_EggESP")
             if hl then hl:Destroy() end
@@ -1141,54 +1155,8 @@ AddToggle(R("PLAYER"), "EGG ESP", false, function(state)
     end)
 end)
 
-AddToggle(R("PLAYER"), "ANTI HIT", false, function(state)
-    -- Simulate anti-hit by making character non-collidable to projectiles
-    if state then
-        for _, part in pairs(Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanTouch = false
-            end
-        end
-    else
-        for _, part in pairs(Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanTouch = true
-            end
-        end
-    end
-end)
-
-AddToggle(R("PLAYER"), "ANTI TRAP", false, function(state)
-    if state then
-        task.spawn(function()
-            while Config.antiTrap do
-                for _, v in pairs(Workspace:GetDescendants()) do
-                    if v.Name:lower():find("trap") and v:IsA("BasePart") then
-                        v.CanTouch = false
-                    end
-                end
-                task.wait(0.5)
-            end
-        end)
-    end
-    Config.antiTrap = state
-end)
-
-AddToggle(R("PLAYER"), "ANTI RAGDOLL", false, function(state)
-    if state then
-        task.spawn(function()
-            while Config.antiRagdoll do
-                Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-                Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-                task.wait(0.3)
-            end
-        end)
-    end
-    Config.antiRagdoll = state
-end)
-
 -- ╔══════════════════════════════════════╗
--- ║       PREDICTOR TAB FEATURES        ║
+-- ║          PREDICTOR TAB              ║
 -- ╚══════════════════════════════════════╝
 
 AddHeader(L("PREDICTOR"), "EGG PREDICTOR")
@@ -1199,84 +1167,128 @@ AddButton(L("PREDICTOR"), "PREDICT CLOSEST EGG", function()
     local egg, dist = getClosestEgg()
     if egg then
         local rarity = getRarity(egg)
-        local val = egg:GetAttribute("Value") or egg:GetAttribute("value") or "?"
-        local name = egg.Name
-        predResultLabel.Text = string.format("Egg: %s | Rarity: %s | Val: %s", name, rarity, tostring(val))
+        local val = egg:GetAttribute("Value") or egg:GetAttribute("value") or
+                    egg:GetAttribute("Worth") or egg:GetAttribute("worth") or "?"
+        predResultLabel.Text = string.format("%s | %s | Val:%s | %.0fst", egg.Name, rarity, tostring(val), dist)
         predResultLabel.TextColor3 = C.gold
     else
-        predResultLabel.Text = "No egg found nearby."
+        predResultLabel.Text = "No egg nearby."
     end
 end)
 
-AddToggle(L("PREDICTOR"), "EGG PREVIEW CARD (AUTO)", false, function(state)
+AddToggle(L("PREDICTOR"), "LIVE EGG PREVIEW", false, function(state)
+    Config.eggPreview = state
     if state then
         task.spawn(function()
             while Config.eggPreview do
-                local egg, _ = getClosestEgg()
+                local egg, dist = getClosestEgg()
                 if egg then
                     local rarity = getRarity(egg)
-                    local val = egg:GetAttribute("Value") or "?"
+                    local val = egg:GetAttribute("Value") or egg:GetAttribute("Worth") or "?"
                     predResultLabel.Text = string.format("[LIVE] %s | %s | Val:%s", egg.Name, rarity, tostring(val))
+                    predResultLabel.TextColor3 = C.gold
                 end
                 task.wait(0.5)
             end
         end)
     end
-    Config.eggPreview = state
 end)
 
-AddButton(L("PREDICTOR"), "SCAN ALL EGGS IN MAP", function()
+AddButton(L("PREDICTOR"), "SCAN ALL EGGS", function()
     local eggs = getEggs()
-    predResultLabel.Text = string.format("Found %d eggs in workspace.", #eggs)
-end)
-
-AddHeader(R("PREDICTOR"), "RIFT & FUSE PREDICTOR")
-
-local riftLabel = AddInfo(R("PREDICTOR"), "Rift Outcome: —")
-
-AddButton(R("PREDICTOR"), "PREDICT RIFT SPAWN", function()
-    -- Read rift seed/timer attributes if present
-    local rift = Workspace:FindFirstChild("Rift", true)
-    if rift then
-        local timer = rift:GetAttribute("Timer") or rift:GetAttribute("SpawnTimer") or "?"
-        local reward = rift:GetAttribute("Reward") or rift:GetAttribute("reward") or "?"
-        riftLabel.Text = string.format("Rift in: %s | Drop: %s", tostring(timer), tostring(reward))
-    else
-        riftLabel.Text = "No rift detected in workspace."
+    local rarityCount = {}
+    for _, egg in pairs(eggs) do
+        local r = getRarity(egg)
+        rarityCount[r] = (rarityCount[r] or 0) + 1
     end
-end)
-
-local fuseLabel = AddInfo(R("PREDICTOR"), "Fuse Outcome: —")
-
-AddButton(R("PREDICTOR"), "PREDICT FUSE OUTCOME", function()
-    -- Read fuse table from ReplicatedStorage if exists
-    local fuseTable = ReplicatedStorage:FindFirstChild("FuseData", true) or ReplicatedStorage:FindFirstChild("Combinations", true)
-    if fuseTable then
-        fuseLabel.Text = "Fuse data found: " .. fuseTable.Name
-    else
-        fuseLabel.Text = "Fuse: No data table found."
+    local out = string.format("Total: %d eggs\n", #eggs)
+    for r, count in pairs(rarityCount) do
+        out = out .. string.format("%s: %d  ", r, count)
     end
+    predResultLabel.Text = out
+    predResultLabel.Size = UDim2.new(1, -4, 0, 48)
 end)
 
-AddToggle(R("PREDICTOR"), "RIFT RECIPE EGG PRIORITY", false, function(state)
-    Config.riftPriority = state
-end)
-
-AddToggle(R("PREDICTOR"), "EGG SPAWN PREDICTOR", false, function(state)
+AddToggle(L("PREDICTOR"), "EGG SPAWN PREDICTOR", false, function(state)
     Config.spawnPredict = state
     if state then
         task.spawn(function()
+            local lastCount = #getEggs()
             while Config.spawnPredict do
-                local eggs = getEggs()
-                predResultLabel.Text = string.format("[SCAN] %d eggs live in map.", #eggs)
-                task.wait(2)
+                local currentCount = #getEggs()
+                if currentCount > lastCount then
+                    predResultLabel.Text = string.format("[NEW] %d egg(s) spawned!", currentCount - lastCount)
+                    predResultLabel.TextColor3 = C.green
+                end
+                lastCount = currentCount
+                task.wait(1)
+            end
+        end)
+    end
+end)
+
+AddHeader(R("PREDICTOR"), "RIFT & FUSE")
+
+local riftLabel = AddInfo(R("PREDICTOR"), "Rift: —")
+
+AddButton(R("PREDICTOR"), "SCAN RIFT STATUS", function()
+    local rift =
+        Workspace:FindFirstChild("Rift", true) or
+        Workspace:FindFirstChild("Portal", true)
+    if rift then
+        local timer = rift:GetAttribute("Timer") or rift:GetAttribute("SpawnTimer") or "Active"
+        local reward = rift:GetAttribute("Reward") or rift:GetAttribute("Drop") or "?"
+        riftLabel.Text = string.format("Rift: %s | Drop: %s", tostring(timer), tostring(reward))
+        riftLabel.TextColor3 = C.green
+    else
+        riftLabel.Text = "No rift in map."
+    end
+end)
+
+local fuseLabel = AddInfo(R("PREDICTOR"), "Fuse: —")
+
+AddButton(R("PREDICTOR"), "SCAN FUSE DATA", function()
+    local fuseTable =
+        ReplicatedStorage:FindFirstChild("FuseData", true) or
+        ReplicatedStorage:FindFirstChild("Combinations", true) or
+        ReplicatedStorage:FindFirstChild("Recipes", true)
+    if fuseTable then
+        fuseLabel.Text = "Fuse data: " .. fuseTable.Name
+        fuseLabel.TextColor3 = C.green
+    else
+        fuseLabel.Text = "No fuse table found."
+    end
+end)
+
+AddToggle(R("PREDICTOR"), "RIFT EGG PRIORITY", false, function(state)
+    Config.riftPriority = state
+end)
+
+AddToggle(R("PREDICTOR"), "AUTO HIGHLIGHT RARE+", false, function(state)
+    if state then
+        task.spawn(function()
+            while state do
+                for _, egg in pairs(getEggs()) do
+                    local tier = getRarityTier(egg)
+                    if tier >= 3 and not egg:FindFirstChild("_RareESP") then
+                        local hl = Instance.new("SelectionBox")
+                        hl.Name = "_RareESP"
+                        hl.Adornee = egg
+                        hl.Color3 = Color3.fromRGB(150, 60, 255)
+                        hl.LineThickness = 0.06
+                        hl.SurfaceTransparency = 0.7
+                        hl.SurfaceColor3 = Color3.fromRGB(150, 60, 255)
+                        hl.Parent = egg
+                    end
+                end
+                task.wait(1)
             end
         end)
     end
 end)
 
 -- ╔══════════════════════════════════════╗
--- ║        PROGRESS TAB FEATURES        ║
+-- ║          PROGRESS TAB               ║
 -- ╚══════════════════════════════════════╝
 
 AddHeader(L("PROGRESS"), "AUTO PROGRESSION")
@@ -1286,7 +1298,9 @@ AddToggle(L("PROGRESS"), "AUTO PROGRESSION", false, function(state)
     if state then
         task.spawn(function()
             while Config.autoProgress do
-                local progRemote = findRemote("progress") or findRemote("advance") or findRemote("quest")
+                local progRemote =
+                    findRemote("Progress") or findRemote("Quest") or
+                    findRemote("advance") or findRemote("complete")
                 if progRemote then pcall(function() progRemote:FireServer() end) end
                 task.wait(3)
             end
@@ -1299,8 +1313,15 @@ AddToggle(L("PROGRESS"), "AUTO CLAIM REWARDS", false, function(state)
     if state then
         task.spawn(function()
             while Config.autoClaimRewards do
-                local claimRemote = findRemote("claim") or findRemote("reward") or findRemote("daily")
+                local claimRemote =
+                    findRemote("ClaimReward") or findRemote("DailyReward") or
+                    findRemote("claim") or findRemote("reward")
                 if claimRemote then pcall(function() claimRemote:FireServer() end) end
+                local pp = Workspace:FindFirstChild("DailyReward", true) or Workspace:FindFirstChild("Reward", true)
+                if pp then
+                    local prox = pp:FindFirstChildOfClass("ProximityPrompt") or pp:FindFirstChild("ProximityPrompt", true)
+                    if prox then pcall(function() fireproximityprompt(prox) end) end
+                end
                 task.wait(5)
             end
         end)
@@ -1312,7 +1333,9 @@ AddToggle(L("PROGRESS"), "AUTO BASE UPGRADE", false, function(state)
     if state then
         task.spawn(function()
             while Config.autoBaseUpgrade do
-                local upgrRemote = findRemote("upgrade") or findRemote("base")
+                local upgrRemote =
+                    findRemote("UpgradeBase") or findRemote("BaseUpgrade") or
+                    findRemote("upgrade") or findRemote("base")
                 if upgrRemote then pcall(function() upgrRemote:FireServer() end) end
                 task.wait(4)
             end
@@ -1325,7 +1348,9 @@ AddToggle(L("PROGRESS"), "AUTO TREADMILL UPGRADE", false, function(state)
     if state then
         task.spawn(function()
             while Config.autoTreadmillUpgrade do
-                local tUpgr = findRemote("treadmillupgrade") or findRemote("upgradeTreadmill")
+                local tUpgr =
+                    findRemote("UpgradeTreadmill") or findRemote("TreadmillUpgrade") or
+                    findRemote("treadmillupgrade")
                 if tUpgr then pcall(function() tUpgr:FireServer() end) end
                 task.wait(4)
             end
@@ -1338,7 +1363,8 @@ AddToggle(L("PROGRESS"), "AUTO TRAIL BUYING", false, function(state)
     if state then
         task.spawn(function()
             while Config.autoTrail do
-                local trailRemote = findRemote("trail") or findRemote("buytrail")
+                local trailRemote =
+                    findRemote("BuyTrail") or findRemote("trail") or findRemote("buytrail")
                 if trailRemote then pcall(function() trailRemote:FireServer() end) end
                 task.wait(5)
             end
@@ -1353,57 +1379,58 @@ AddToggle(R("PROGRESS"), "SMART SERVER HOP", false, function(state)
     if state then
         task.spawn(function()
             while Config.smartHop do
-                task.wait(30)
+                task.wait(60)
                 if Config.smartHop then
-                    pcall(function()
-                        TeleportService:Teleport(game.PlaceId, LocalPlayer)
-                    end)
+                    pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
                 end
             end
         end)
     end
 end)
 
-local jobLabel = AddInfo(R("PROGRESS"), "Job ID: " .. game.JobId)
+local jobLabel = AddInfo(R("PROGRESS"), "Job ID: " .. tostring(game.JobId):sub(1, 20) .. "...")
 
 AddButton(R("PROGRESS"), "COPY JOB ID", function()
-    setclipboard(game.JobId)
-    jobLabel.Text = "Job ID copied!"
-    task.delay(2, function() jobLabel.Text = "Job ID: " .. game.JobId end)
+    pcall(function() setclipboard(game.JobId) end)
+    jobLabel.Text = "Copied!"
+    task.delay(2, function() jobLabel.Text = "Job ID: " .. tostring(game.JobId):sub(1,20) .. "..." end)
 end)
 
 AddButton(R("PROGRESS"), "REJOIN SERVER", function()
-    TeleportService:Teleport(game.PlaceId, LocalPlayer)
+    pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
 end)
 
 AddButton(R("PROGRESS"), "HOP TO NEW SERVER", function()
-    local servers = {}
-    local ok, pages = pcall(function()
-        return game:GetService("HttpService"):JSONDecode(
-            game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=25")
-        )
-    end)
-    if ok and pages and pages.data then
-        for _, s in ipairs(pages.data) do
-            if s.id ~= game.JobId and s.playing < s.maxPlayers then
-                table.insert(servers, s.id)
+    task.spawn(function()
+        local ok, result = pcall(function()
+            return HttpService:JSONDecode(
+                game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=25")
+            )
+        end)
+        local servers = {}
+        if ok and result and result.data then
+            for _, s in ipairs(result.data) do
+                if s.id ~= game.JobId and s.playing < s.maxPlayers then
+                    table.insert(servers, s.id)
+                end
             end
         end
-    end
-    if #servers > 0 then
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LocalPlayer)
-    else
-        pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
-    end
+        if #servers > 0 then
+            pcall(function()
+                TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LocalPlayer)
+            end)
+        else
+            pcall(function() TeleportService:Teleport(game.PlaceId, LocalPlayer) end)
+        end
+    end)
 end)
 
 -- ╔══════════════════════════════════════╗
--- ║          MISC TAB FEATURES          ║
+-- ║          MISC TAB                   ║
 -- ╚══════════════════════════════════════╝
 
 AddHeader(L("MISC"), "PERFORMANCE")
 
--- FPS display overlay
 local fpsLabel = AddInfo(L("MISC"), "FPS: — | Ping: —")
 local fpsCount = 0
 local lastFps = tick()
@@ -1412,7 +1439,8 @@ RunService.RenderStepped:Connect(function()
     fpsCount = fpsCount + 1
     if tick() - lastFps >= 1 then
         local fps = fpsCount
-        local ping = LocalPlayer:GetNetworkPing and math.floor(LocalPlayer:GetNetworkPing() * 1000) or 0
+        local ping = 0
+        pcall(function() ping = math.floor(LocalPlayer:GetNetworkPing() * 1000) end)
         fpsLabel.Text = string.format("FPS: %d | Ping: %dms", fps, ping)
         fpsCount = 0
         lastFps = tick()
@@ -1424,20 +1452,17 @@ AddToggle(L("MISC"), "FPS UNLOCKER", false, function(state)
 end)
 
 AddSlider(L("MISC"), "FPS Cap", 30, 240, 60, "%d fps", function(v)
+    Config.fpsCap = v
     pcall(function() setfpscap(v) end)
 end)
 
-AddToggle(L("MISC"), "ANTI-AFK", true, function(state)
-    -- handled by top-level heartbeat; this is visual
-end)
+AddToggle(L("MISC"), "ANTI-AFK", true, function() end)
 
 AddHeader(L("MISC"), "KEYBINDS")
+AddInfo(L("MISC"), "RightShift — Toggle UI")
+AddInfo(L("MISC"), "Delete — Close Script")
 
-local keybindLabel = AddInfo(L("MISC"), "RightShift = Toggle UI")
-AddInfo(L("MISC"), "Delete = Emergency Close")
-
--- Search bar (filter feature names)
-AddHeader(R("MISC"), "SEARCH FEATURES")
+AddHeader(R("MISC"), "SEARCH")
 
 local searchBox = Instance.new("TextBox")
 searchBox.PlaceholderText = "Search features..."
@@ -1452,51 +1477,46 @@ searchBox.ClearTextOnFocus = false
 searchBox.ZIndex = 4
 searchBox.Parent = R("MISC")
 Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 5)
-local searchPad = Instance.new("UIPadding", searchBox)
-searchPad.PaddingLeft = UDim.new(0, 8)
+local sp = Instance.new("UIPadding", searchBox)
+sp.PaddingLeft = UDim.new(0, 8)
 
-local searchResults = AddInfo(R("MISC"), "Type to search features.")
+local searchResults = AddInfo(R("MISC"), "Type to search.")
+searchResults.Size = UDim2.new(1, -4, 0, 120)
+searchResults.TextWrapped = true
 
 local allFeatureNames = {
-    "Auto Steal Egg","Instant Steal","Auto Hatch","Auto Treadmill","Auto Pet Selling",
-    "Auto Fuse","Auto Favorite","Auto Rift","Speed Boost","Infinite Jump","Invisibility",
-    "Anti Hit","Anti Trap","Anti Ragdoll","Player ESP","Egg ESP","Egg Predictor",
-    "Rift Predictor","Fuse Predictor","Auto Progression","Auto Claim Rewards",
-    "Auto Base Upgrade","Auto Trail","Smart Server Hop","FPS Unlocker","Anti-AFK"
+    "Auto Steal Egg","Instant Steal","Steal All Nearby","Auto Hatch Equip",
+    "Auto Treadmill","Auto Pet Selling","Auto Fuse","Auto Favorite",
+    "Auto Rift Farm","Speed Boost","Infinite Jump","Noclip",
+    "Anti Trap","Anti Ragdoll","Invisibility","Invis Egg","Anti Hit",
+    "Player ESP","Egg ESP","Live Egg Preview","Egg Spawn Predictor",
+    "Scan All Eggs","Rift Egg Priority","Auto Highlight Rare",
+    "Auto Progression","Auto Claim Rewards","Auto Base Upgrade",
+    "Auto Treadmill Upgrade","Auto Trail Buying","Smart Server Hop",
+    "Rejoin Server","Hop To New Server","FPS Unlocker","Anti-AFK",
+    "Velocity Spoofer","Remote Blocker","Save Config","Load Config"
 }
 
 searchBox:GetPropertyChangedSignal("Text"):Connect(function()
     local query = searchBox.Text:lower()
-    if query == "" then
-        searchResults.Text = "Type to search features."
-        return
-    end
+    if query == "" then searchResults.Text = "Type to search."; return end
     local found = {}
     for _, name in ipairs(allFeatureNames) do
         if name:lower():find(query, 1, true) then
-            table.insert(found, name)
+            table.insert(found, "• " .. name)
         end
     end
-    if #found == 0 then
-        searchResults.Text = "No matches."
-    else
-        searchResults.Text = table.concat(found, "\n")
-        searchResults.Size = UDim2.new(1, -4, 0, #found * 16 + 4)
-    end
+    searchResults.Text = #found > 0 and table.concat(found, "\n") or "No matches."
 end)
 
 -- ╔══════════════════════════════════════╗
--- ║        SETTINGS TAB FEATURES        ║
+-- ║          SETTINGS TAB               ║
 -- ╚══════════════════════════════════════╝
 
 AddHeader(L("SETTINGS"), "UI SETTINGS")
 
-AddToggle(L("SETTINGS"), "DARK MODE (DEFAULT)", true, function(state)
-    if not state then
-        Main.BackgroundColor3 = Color3.fromRGB(230, 230, 240)
-    else
-        Main.BackgroundColor3 = C.bg
-    end
+AddToggle(L("SETTINGS"), "DARK MODE", true, function(state)
+    Main.BackgroundColor3 = state and C.bg or Color3.fromRGB(230, 230, 240)
 end)
 
 AddToggle(L("SETTINGS"), "SHOW FPS OVERLAY", true, function(state)
@@ -1504,68 +1524,58 @@ AddToggle(L("SETTINGS"), "SHOW FPS OVERLAY", true, function(state)
 end)
 
 AddToggle(L("SETTINGS"), "COMPACT MODE", false, function(state)
-    if state then
-        TweenService:Create(Main, TweenInfo.new(0.25), {Size = UDim2.new(0, 580, 0, 360)}):Play()
-    else
-        TweenService:Create(Main, TweenInfo.new(0.25), {Size = UDim2.new(0, 680, 0, 420)}):Play()
-    end
+    TweenService:Create(Main, TweenInfo.new(0.25), {
+        Size = state and UDim2.new(0, 580, 0, 360) or UDim2.new(0, 680, 0, 420)
+    }):Play()
 end)
 
-AddHeader(R("SETTINGS"), "BYPASS SETTINGS")
+AddHeader(R("SETTINGS"), "BYPASS")
 
 AddToggle(R("SETTINGS"), "VELOCITY SPOOFER", true, function(state)
     spoofVelocity = state
 end)
 
-AddToggle(R("SETTINGS"), "REMOTE BLOCKER", true, function(state)
-    -- visual indicator; hook is always active
-end)
+AddToggle(R("SETTINGS"), "REMOTE BLOCKER", true, function() end)
 
-AddButton(R("SETTINGS"), "NUKE ANTI-CHEAT REMOTES", function()
-    local count = 0
+AddButton(R("SETTINGS"), "NUKE AC REMOTES", function()
     for _, v in pairs(ReplicatedStorage:GetDescendants()) do
         if (v:IsA("RemoteEvent") or v:IsA("RemoteFunction")) and isBlocked(v.Name) then
             pcall(function() v:Destroy() end)
-            count = count + 1
         end
     end
     for _, v in pairs(Workspace:GetDescendants()) do
         if (v:IsA("RemoteEvent") or v:IsA("RemoteFunction")) and isBlocked(v.Name) then
             pcall(function() v:Destroy() end)
-            count = count + 1
         end
     end
 end)
 
+AddHeader(R("SETTINGS"), "CONFIG")
+
 AddButton(R("SETTINGS"), "SAVE CONFIG", function()
     pcall(function()
-        writefile("YushHub_Config.json", HttpService:JSONEncode(Config))
+        writefile("YushHub_SAE.json", HttpService:JSONEncode(Config))
     end)
 end)
 
 AddButton(R("SETTINGS"), "LOAD CONFIG", function()
     pcall(function()
-        if isfile("YushHub_Config.json") then
-            local loaded = HttpService:JSONDecode(readfile("YushHub_Config.json"))
+        if isfile("YushHub_SAE.json") then
+            local loaded = HttpService:JSONDecode(readfile("YushHub_SAE.json"))
             for k, v in pairs(loaded) do Config[k] = v end
         end
     end)
 end)
 
-AddButton(R("SETTINGS"), "RESET ALL", function()
-    for _, page in pairs(Pages) do
-        for _, col in pairs(page:GetChildren()) do
-            if col:IsA("ScrollingFrame") then
-                for _, elem in pairs(col:GetChildren()) do
-                    if elem:IsA("Frame") then elem:Destroy() end
-                end
-            end
-        end
+AddButton(R("SETTINGS"), "RESET CONFIG", function()
+    for k, v in pairs(Config) do
+        if type(v) == "boolean" then Config[k] = false
+        elseif type(v) == "number" then Config[k] = 0 end
     end
 end)
 
 -- ╔══════════════════════════════════════╗
--- ║        GLOBAL KEYBINDS              ║
+-- ║          GLOBAL KEYBINDS            ║
 -- ╚══════════════════════════════════════╝
 
 UserInputService.InputBegan:Connect(function(inp, gpe)
@@ -1578,10 +1588,6 @@ UserInputService.InputBegan:Connect(function(inp, gpe)
     end
 end)
 
--- ╔══════════════════════════════════════╗
--- ║          OPEN DEFAULT TAB           ║
--- ╚══════════════════════════════════════╝
-
 TabBtns["FARM"].btn.MouseButton1Click:Fire()
 
-print("[Yush Hub] Loaded | SAE Script V2 | RightShift to toggle | Delete to close")
+print("[Yush Hub] SAE V2 Loaded | RightShift = Toggle | Delete = Close")
